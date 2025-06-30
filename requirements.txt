@@ -1,0 +1,4 @@
+gradio==4.25.0
+requests
+PyMuPDF
+markdown
