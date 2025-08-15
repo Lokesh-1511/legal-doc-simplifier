@@ -9,30 +9,44 @@
 <body>
   <div class="container">
     <h1>Legal Document Simplifier</h1>
-    <div class="input-group">
-      <label>Input Method:</label>
-      <div class="radio-group">
-        <input type="radio" id="upload" name="inputMode" value="Upload PDF" checked>
-        <label for="upload">Upload PDF</label>
-        <input type="radio" id="paste" name="inputMode" value="Paste Text">
-        <label for="paste">Paste Text</label>
+    <div class="main-row">
+      <div class="simplifier-section">
+        <div class="input-group">
+          <label>Input Method:</label>
+          <div class="radio-group">
+            <input type="radio" id="upload" name="inputMode" value="Upload PDF" checked>
+            <label for="upload">Upload PDF</label>
+            <input type="radio" id="paste" name="inputMode" value="Paste Text">
+            <label for="paste">Paste Text</label>
+          </div>
+          <input type="file" id="pdfInput" accept=".pdf">
+          <textarea id="textInput" rows="8" placeholder="Paste legal text here..." style="display:none;"></textarea>
+        </div>
+        <div class="input-group">
+          <label>Simplification Level:</label>
+          <div class="radio-group">
+            <input type="radio" id="eli5" name="simplicity" value="Quick Summary (ELI5)">
+            <label for="eli5">Quick Summary (ELI5)</label>
+            <input type="radio" id="standard" name="simplicity" value="Standard View" checked>
+            <label for="standard">Standard View</label>
+            <input type="radio" id="detailed" name="simplicity" value="Detailed Breakdown">
+            <label for="detailed">Detailed Breakdown</label>
+          </div>
+        </div>
+        <button id="simplifyBtn">Simplify Document</button>
+        <div class="output" id="output"></div>
       </div>
-      <input type="file" id="pdfInput" accept=".pdf">
-      <textarea id="textInput" rows="8" placeholder="Paste legal text here..." style="display:none;"></textarea>
-    </div>
-    <div class="input-group">
-      <label>Simplification Level:</label>
-      <div class="radio-group">
-        <input type="radio" id="eli5" name="simplicity" value="Quick Summary (ELI5)">
-        <label for="eli5">Quick Summary (ELI5)</label>
-        <input type="radio" id="standard" name="simplicity" value="Standard View" checked>
-        <label for="standard">Standard View</label>
-        <input type="radio" id="detailed" name="simplicity" value="Detailed Breakdown">
-        <label for="detailed">Detailed Breakdown</label>
+      <div class="chatbot-section">
+        <div class="chatbot-container">
+          <h2>Ask the Legal AI Chatbot</h2>
+          <div class="chat-window" id="chatWindow"></div>
+          <form id="chatForm" autocomplete="off" style="margin-top:1em;display:flex;gap:0.5em;">
+            <input type="text" id="chatInput" placeholder="Type your question..." style="flex:1;padding:0.7em;border-radius:6px;border:1px solid #d1d5db;">
+            <button type="submit">Send</button>
+          </form>
+        </div>
       </div>
     </div>
-    <button id="simplifyBtn">Simplify Document</button>
-    <div class="output" id="output"></div>
     <div class="disclaimer">Disclaimer: This tool is for informational purposes only.</div>
   </div>
   <script src="script.js"></script>
