@@ -36,11 +36,7 @@ chatForm.addEventListener('submit', async function(e) {
     return;
   }
 
-  // TODO: Replace with your API endpoint and key
-  const apiUrl = 'YOUR_CHATBOT_API_ENDPOINT';
-  const apiKey = 'YOUR_API_KEY';
-
-  // Prepare payload similar to backend logic
+  // Prepare payload for backend
   const payload = {
     summary: summary,
     history: chatHistory.map(m => ({role: m.role, content: m.content})),
@@ -48,10 +44,9 @@ chatForm.addEventListener('submit', async function(e) {
   };
 
   try {
-    const response = await fetch(apiUrl, {
+    const response = await fetch('http://127.0.0.1:8000/chatbot', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(payload)
@@ -90,9 +85,24 @@ simplifyBtn.addEventListener('click', async function() {
       output.textContent = '⚠️ Please upload a PDF file.';
       return;
     }
-    // TODO: Add PDF extraction logic here (e.g., using PDF.js or send to backend)
-    output.textContent = 'PDF extraction not implemented in frontend.';
-    return;
+    // Send PDF to backend for extraction
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const response = await fetch('http://127.0.0.1:8000/extract_pdf', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await response.json();
+      text = data.text;
+      if (!text || text.startsWith('⚠️')) {
+        output.textContent = text || '⚠️ PDF extraction failed.';
+        return;
+      }
+    } catch (err) {
+      output.textContent = '⚠️ PDF extraction error: ' + err.message;
+      return;
+    }
   } else {
     text = document.getElementById('textInput').value.trim();
     if (!text) {
@@ -101,15 +111,11 @@ simplifyBtn.addEventListener('click', async function() {
     }
   }
 
-  // TODO: Replace with your API endpoint and key
-  const apiUrl = 'YOUR_API_ENDPOINT';
-  const apiKey = 'YOUR_API_KEY';
-
+  // Send text and level to backend for simplification
   try {
-    const response = await fetch(apiUrl, {
+    const response = await fetch('http://127.0.0.1:8000/simplify', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
