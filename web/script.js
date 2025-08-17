@@ -1,3 +1,24 @@
+// --- Theme Toggle Logic ---
+const themeToggle = document.getElementById('themeToggle');
+const body = document.body;
+function setTheme(dark) {
+  if (dark) {
+    body.classList.add('dark');
+    themeToggle.textContent = '☀️';
+    localStorage.setItem('theme', 'dark');
+  } else {
+    body.classList.remove('dark');
+    themeToggle.textContent = '🌙';
+    localStorage.setItem('theme', 'light');
+  }
+}
+themeToggle.addEventListener('click', () => {
+  setTheme(!body.classList.contains('dark'));
+});
+// On load, set theme from localStorage or system preference
+const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+const savedTheme = localStorage.getItem('theme');
+setTheme(savedTheme === 'dark' || (!savedTheme && prefersDark));
 // --- Chatbot UI Logic ---
 const chatWindow = document.getElementById('chatWindow');
 const chatForm = document.getElementById('chatForm');
