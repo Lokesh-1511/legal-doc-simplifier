@@ -2,57 +2,188 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Legal Document Simplifier</title>
+  <title>LegalEase - Document Simplifier</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
-  <div class="theme-toggle-row">
-    <button id="themeToggle" aria-label="Toggle light/dark mode">🌙</button>
-  </div>
-  <div class="container">
-    <h1>Legal Document Simplifier</h1>
-    <div class="main-row">
-      <div class="simplifier-section">
-        <div class="input-group">
-          <label>Input Method:</label>
-          <div class="radio-group">
-            <input type="radio" id="upload" name="inputMode" value="Upload PDF" checked>
-            <label for="upload">Upload PDF</label>
-            <input type="radio" id="paste" name="inputMode" value="Paste Text">
-            <label for="paste">Paste Text</label>
-          </div>
-          <input type="file" id="pdfInput" accept=".pdf">
-          <textarea id="textInput" rows="8" placeholder="Paste legal text here..." style="display:none;"></textarea>
-        </div>
-        <div class="input-group">
-          <label>Simplification Level:</label>
-          <div class="radio-group">
-            <input type="radio" id="eli5" name="simplicity" value="Quick Summary (ELI5)">
-            <label for="eli5">Quick Summary (ELI5)</label>
-            <input type="radio" id="standard" name="simplicity" value="Standard View" checked>
-            <label for="standard">Standard View</label>
-            <input type="radio" id="detailed" name="simplicity" value="Detailed Breakdown">
-            <label for="detailed">Detailed Breakdown</label>
-          </div>
-        </div>
-        <button id="simplifyBtn">Simplify Document</button>
-        <div class="output" id="output"></div>
+  <nav class="navbar">
+    <div class="nav-container">
+      <div class="nav-brand">
+        <i class="fas fa-scale-balanced"></i>
+        <span>LegalEase</span>
       </div>
-      <div class="chatbot-section">
-        <div class="chatbot-container">
-          <h2>Ask the Legal AI Chatbot</h2>
-          <div class="chat-window" id="chatWindow"></div>
-          <form id="chatForm" autocomplete="off" style="margin-top:1em;display:flex;gap:0.5em;">
-            <input type="text" id="chatInput" placeholder="Type your question..." style="flex:1;padding:0.7em;border-radius:6px;border:1px solid #d1d5db;">
-            <button type="submit">Send</button>
-          </form>
-        </div>
+      <div class="nav-controls">
+        <button id="themeToggle" class="theme-btn" aria-label="Toggle theme">
+          <i class="fas fa-moon"></i>
+        </button>
       </div>
     </div>
-    <div class="disclaimer">Disclaimer: This tool is for informational purposes only.</div>
-  </div>
-  </div>
+  </nav>
+
+  <main class="main-content">
+    <div class="hero-section">
+      <div class="hero-content">
+        <h1 class="hero-title">
+          <span class="gradient-text">Simplify Legal Documents</span>
+          <br>with AI-Powered Intelligence
+        </h1>
+        <p class="hero-subtitle">Transform complex legal language into clear, understandable content in seconds</p>
+      </div>
+    </div>
+
+    <div class="workspace">
+      <div class="workspace-grid">
+        <!-- Document Processing Section -->
+        <section class="panel document-panel">
+          <div class="panel-header">
+            <div class="panel-icon">
+              <i class="fas fa-file-alt"></i>
+            </div>
+            <h2>Document Processor</h2>
+          </div>
+          
+          <div class="panel-content">
+            <div class="input-method-selector">
+              <div class="selector-tabs">
+                <button class="tab-btn active" data-method="upload">
+                  <i class="fas fa-upload"></i>
+                  Upload PDF
+                </button>
+                <button class="tab-btn" data-method="paste">
+                  <i class="fas fa-paste"></i>
+                  Paste Text
+                </button>
+              </div>
+            </div>
+
+            <div class="input-container">
+              <div class="upload-zone" id="uploadZone">
+                <div class="upload-content">
+                  <i class="fas fa-cloud-upload-alt"></i>
+                  <h3>Drop your PDF here</h3>
+                  <p>or click to browse</p>
+                  <input type="file" id="pdfInput" accept=".pdf" hidden>
+                </div>
+              </div>
+              
+              <div class="text-input-zone" id="textZone" style="display:none;">
+                <textarea id="textInput" placeholder="Paste your legal document text here..."></textarea>
+              </div>
+            </div>
+
+            <div class="simplification-options">
+              <label class="options-label">Simplification Level</label>
+              <div class="options-grid">
+                <div class="option-card">
+                  <input type="radio" id="eli5" name="simplicity" value="Quick Summary (ELI5)">
+                  <label for="eli5" class="option-label">
+                    <div class="option-icon">🎯</div>
+                    <div class="option-text">
+                      <strong>Quick Summary</strong>
+                      <span>Simple explanations</span>
+                    </div>
+                  </label>
+                </div>
+                
+                <div class="option-card">
+                  <input type="radio" id="standard" name="simplicity" value="Standard View" checked>
+                  <label for="standard" class="option-label">
+                    <div class="option-icon">📋</div>
+                    <div class="option-text">
+                      <strong>Standard View</strong>
+                      <span>Balanced detail</span>
+                    </div>
+                  </label>
+                </div>
+                
+                <div class="option-card">
+                  <input type="radio" id="detailed" name="simplicity" value="Detailed Breakdown">
+                  <label for="detailed" class="option-label">
+                    <div class="option-icon">🔍</div>
+                    <div class="option-text">
+                      <strong>Detailed Analysis</strong>
+                      <span>Comprehensive breakdown</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <button id="simplifyBtn" class="action-btn primary">
+              <i class="fas fa-magic"></i>
+              Simplify Document
+            </button>
+
+            <div class="result-container">
+              <div class="result-header">
+                <h3>Simplified Document</h3>
+                <div class="result-actions">
+                  <button class="icon-btn" title="Copy to clipboard">
+                    <i class="fas fa-copy"></i>
+                  </button>
+                  <button class="icon-btn" title="Download as text">
+                    <i class="fas fa-download"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="result-content" id="output"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- AI Chat Section -->
+        <section class="panel chat-panel">
+          <div class="panel-header">
+            <div class="panel-icon">
+              <i class="fas fa-robot"></i>
+            </div>
+            <h2>AI Legal Assistant</h2>
+            <div class="status-indicator online">
+              <span class="status-dot"></span>
+              Online
+            </div>
+          </div>
+          
+          <div class="panel-content">
+            <div class="chat-container">
+              <div class="chat-messages" id="chatWindow">
+                <div class="welcome-message">
+                  <div class="ai-avatar">
+                    <i class="fas fa-robot"></i>
+                  </div>
+                  <div class="message-content">
+                    <p>Hello! I'm your AI legal assistant. Ask me anything about legal documents, terms, or concepts.</p>
+                  </div>
+                </div>
+              </div>
+              
+              <form id="chatForm" class="chat-input-form">
+                <div class="chat-input-container">
+                  <input type="text" id="chatInput" placeholder="Ask about legal terms, clauses, or concepts..." autocomplete="off">
+                  <button type="submit" class="send-btn">
+                    <i class="fas fa-paper-plane"></i>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <footer class="footer">
+      <div class="footer-content">
+        <div class="disclaimer">
+          <i class="fas fa-info-circle"></i>
+          <span>This tool is for informational purposes only and does not constitute legal advice.</span>
+        </div>
+      </div>
+    </footer>
+  </main>
+
   <script src="script.js"></script>
 </body>
 </html>
