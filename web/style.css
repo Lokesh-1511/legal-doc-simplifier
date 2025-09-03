@@ -302,8 +302,7 @@ body {
 
 .upload-zone.dragover {
   border-color: var(--primary-blue);
-  background: var(--primary-blue);
-  background-opacity: 0.1;
+  background-color: rgba(37, 99, 235, 0.1);
 }
 
 .upload-content i {
@@ -696,7 +695,7 @@ body {
 }
 
 /* Dark theme toggle */
-body.dark {
+[data-theme="dark"] {
   --bg-primary: var(--neutral-900);
   --bg-secondary: var(--neutral-800);
   --bg-tertiary: var(--neutral-700);

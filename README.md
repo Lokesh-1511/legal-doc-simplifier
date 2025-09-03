@@ -88,7 +88,6 @@ legal-doc-simplifier/
 │   ├── index.html           # Main frontend interface
 │   ├── script.js            # Frontend JavaScript logic
 │   ├── style.css            # Main stylesheet
-│   └── style-new.css        # Additional styles
 ├── requirements.txt         # Python dependencies
 ├── server.ps1              # PowerShell server startup script
 ├── .env                    # Environment variables (create this)

@@ -1,24 +1,27 @@
 // Wait for DOM to be fully loaded
 document.addEventListener('DOMContentLoaded', function() {
 
+const API_BASE_URL = 'http://127.0.0.1:8000';
+
 // --- Theme Toggle Logic ---
 const themeToggle = document.getElementById('themeToggle');
-const body = document.body;
+const docElement = document.documentElement;
 
 function setTheme(dark) {
   if (dark) {
-    body.classList.add('dark');
+    docElement.setAttribute('data-theme', 'dark');
     themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
     localStorage.setItem('theme', 'dark');
   } else {
-    body.classList.remove('dark');
+    docElement.setAttribute('data-theme', 'light');
     themeToggle.innerHTML = '<i class="fas fa-moon"></i>';
     localStorage.setItem('theme', 'light');
   }
 }
 
 themeToggle.addEventListener('click', () => {
-  setTheme(!body.classList.contains('dark'));
+  const isDark = docElement.getAttribute('data-theme') === 'dark';
+  setTheme(!isDark);
 });
 
 // On load, set theme from localStorage or system preference
@@ -94,7 +97,26 @@ function updateUploadUI(file) {
 const chatWindow = document.getElementById('chatWindow');
 const chatForm = document.getElementById('chatForm');
 const chatInput = document.getElementById('chatInput');
+const clearChatBtn = document.getElementById('clearChatBtn');
 let chatHistory = [];
+
+function renderWelcomeMessage() {
+    chatWindow.innerHTML = `
+        <div class="welcome-message">
+          <div class="ai-avatar">
+            <i class="fas fa-robot"></i>
+          </div>
+          <div class="message-content">
+            <p>Hello! I'm your AI legal assistant. Ask me anything about legal documents, terms, or concepts.</p>
+          </div>
+        </div>
+    `;
+}
+
+clearChatBtn.addEventListener('click', () => {
+    chatHistory = [];
+    renderWelcomeMessage();
+});
 
 function appendMessage(role, text) {
   // Remove welcome message if it exists
@@ -153,7 +175,7 @@ chatForm.addEventListener('submit', async function(e) {
   };
 
   try {
-    const response = await fetch('http://127.0.0.1:8000/chatbot', {
+    const response = await fetch(`${API_BASE_URL}/chatbot`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -206,7 +228,7 @@ simplifyBtn.addEventListener('click', async function() {
     formData.append('file', file);
     
     try {
-      const response = await fetch('http://127.0.0.1:8000/extract_pdf', {
+      const response = await fetch(`${API_BASE_URL}/extract_pdf`, {
         method: 'POST',
         body: formData
       });
@@ -233,7 +255,7 @@ simplifyBtn.addEventListener('click', async function() {
 
   // Send text and level to backend for simplification
   try {
-    const response = await fetch('http://127.0.0.1:8000/simplify', {
+    const response = await fetch(`${API_BASE_URL}/simplify`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
