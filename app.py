@@ -16,7 +16,7 @@ HEADERS = {
     "Authorization": f"Bearer {GROQ_API_KEY}",
     "Content-Type": "application/json"
 }
-MODEL_NAME = "llama3-70b-8192"
+MODEL_NAME = "llama-3.3-70b-versatile"
 
 # --- Global Storage ---
 stored_legal_text = ""

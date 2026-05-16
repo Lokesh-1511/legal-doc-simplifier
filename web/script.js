@@ -1,7 +1,7 @@
 // Wait for DOM to be fully loaded
 document.addEventListener('DOMContentLoaded', function() {
 
-const API_BASE_URL = 'http://127.0.0.1:8000';
+const API_BASE_URL = window.__API_BASE_URL || 'http://127.0.0.1:8000';
 
 // --- Theme Toggle Logic ---
 const themeToggle = document.getElementById('themeToggle');
@@ -99,6 +99,18 @@ const chatForm = document.getElementById('chatForm');
 const chatInput = document.getElementById('chatInput');
 const clearChatBtn = document.getElementById('clearChatBtn');
 let chatHistory = [];
+let loadingMessageEl = null;
+
+function escapeHtml(text) {
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return text.replace(/[&<>"']/g, (m) => map[m]);
+}
 
 function renderWelcomeMessage() {
     chatWindow.innerHTML = `
@@ -134,12 +146,68 @@ function appendMessage(role, text) {
   
   const messageContent = document.createElement('div');
   messageContent.className = 'message-content';
-  messageContent.innerHTML = text;
+  const textBlock = document.createElement('p');
+  textBlock.className = 'chat-answer-text';
+  textBlock.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
+  messageContent.appendChild(textBlock);
   
   msgDiv.appendChild(avatar);
   msgDiv.appendChild(messageContent);
   chatWindow.appendChild(msgDiv);
   chatWindow.scrollTop = chatWindow.scrollHeight;
+}
+
+function appendAiMessageWithSources(text, sources = []) {
+  appendMessage('ai', text);
+  const lastMessage = chatWindow.lastElementChild;
+  if (!lastMessage || !sources.length) {
+    return;
+  }
+
+  const messageContent = lastMessage.querySelector('.message-content');
+  const sourceBlock = document.createElement('div');
+  sourceBlock.className = 'source-block';
+
+  const sourceTitle = document.createElement('div');
+  sourceTitle.className = 'source-title';
+  sourceTitle.textContent = 'Sources';
+  sourceBlock.appendChild(sourceTitle);
+
+  const sourceList = document.createElement('div');
+  sourceList.className = 'source-list';
+  sources.forEach((source) => {
+    const badge = document.createElement('span');
+    badge.className = 'source-chip';
+    badge.textContent = source;
+    sourceList.appendChild(badge);
+  });
+
+  sourceBlock.appendChild(sourceList);
+  messageContent.appendChild(sourceBlock);
+}
+
+function showChatLoading() {
+  if (loadingMessageEl) {
+    return;
+  }
+
+  loadingMessageEl = document.createElement('div');
+  loadingMessageEl.className = 'chat-message ai loading-response';
+  loadingMessageEl.innerHTML = `
+    <div class="ai-avatar"><i class="fas fa-robot"></i></div>
+    <div class="message-content">
+      <p class="chat-answer-text"><i class="fas fa-spinner fa-spin"></i> Retrieving relevant chunks and preparing answer...</p>
+    </div>
+  `;
+  chatWindow.appendChild(loadingMessageEl);
+  chatWindow.scrollTop = chatWindow.scrollHeight;
+}
+
+function hideChatLoading() {
+  if (loadingMessageEl) {
+    loadingMessageEl.remove();
+    loadingMessageEl = null;
+  }
 }
 
 chatForm.addEventListener('submit', async function(e) {
@@ -153,6 +221,7 @@ chatForm.addEventListener('submit', async function(e) {
   const sendBtn = chatForm.querySelector('.send-btn');
   sendBtn.disabled = true;
   sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+  showChatLoading();
 
   // Add to history
   chatHistory.push({role: 'user', content: userMsg});
@@ -160,6 +229,7 @@ chatForm.addEventListener('submit', async function(e) {
   // Get simplified summary from output div
   const summary = document.getElementById('output').innerText.trim();
   if (!summary || summary === 'Your simplified document will appear here...') {
+    hideChatLoading();
     appendMessage('ai', '⚠️ Please simplify a legal document first before asking questions.');
     chatInput.disabled = false;
     sendBtn.disabled = false;
@@ -171,7 +241,8 @@ chatForm.addEventListener('submit', async function(e) {
   const payload = {
     summary: summary,
     history: chatHistory.map(m => ({role: m.role, content: m.content})),
-    question: userMsg
+    question: userMsg,
+    top_k: 4
   };
 
   try {
@@ -184,9 +255,11 @@ chatForm.addEventListener('submit', async function(e) {
     });
     const data = await response.json();
     const aiMsg = data.answer || 'No answer returned.';
-    appendMessage('ai', aiMsg);
+    hideChatLoading();
+    appendAiMessageWithSources(aiMsg, data.sources || []);
     chatHistory.push({role: 'ai', content: aiMsg});
   } catch (err) {
+    hideChatLoading();
     appendMessage('ai', '⚠️ API Error: ' + err.message);
   }
   
