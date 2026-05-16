@@ -1,7 +1,6 @@
 from typing import Dict, List
 
 import numpy as np
-from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 
 
@@ -9,9 +8,18 @@ class SemanticRetriever:
     """Small in-memory semantic retriever using sentence-transformers + cosine similarity."""
 
     def __init__(self, model_name: str = "all-MiniLM-L6-v2") -> None:
-        self.model = SentenceTransformer(model_name)
+        self.model_name = model_name
+        self.model = None
         self.chunks: List[Dict[str, object]] = []
         self.embeddings: np.ndarray | None = None
+
+    def _get_model(self):
+        # Lazy import/load keeps app startup memory lower on small instances.
+        if self.model is None:
+            from sentence_transformers import SentenceTransformer
+
+            self.model = SentenceTransformer(self.model_name)
+        return self.model
 
     def build_index(self, chunks: List[Dict[str, object]]) -> None:
         self.chunks = chunks
@@ -19,21 +27,26 @@ class SemanticRetriever:
             self.embeddings = None
             return
 
+        model = self._get_model()
         texts = [str(chunk["text"]) for chunk in chunks]
-        self.embeddings = self.model.encode(
+        self.embeddings = model.encode(
             texts,
             convert_to_numpy=True,
             normalize_embeddings=True,
+            batch_size=8,
+            show_progress_bar=False,
         )
 
     def search(self, query: str, top_k: int = 4) -> List[Dict[str, object]]:
         if not query.strip() or not self.chunks or self.embeddings is None:
             return []
 
-        query_embedding = self.model.encode(
+        model = self._get_model()
+        query_embedding = model.encode(
             [query],
             convert_to_numpy=True,
             normalize_embeddings=True,
+            show_progress_bar=False,
         )
         similarities = cosine_similarity(query_embedding, self.embeddings)[0]
 
