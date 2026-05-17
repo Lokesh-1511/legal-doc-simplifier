@@ -100,6 +100,7 @@ const chatInput = document.getElementById('chatInput');
 const clearChatBtn = document.getElementById('clearChatBtn');
 let chatHistory = [];
 let loadingMessageEl = null;
+let extractedPages = [];
 
 function escapeHtml(text) {
   const map = {
@@ -186,6 +187,24 @@ function appendAiMessageWithSources(text, sources = []) {
   messageContent.appendChild(sourceBlock);
 }
 
+function appendDebugBlock(debug) {
+  if (!debug) return;
+
+  const lastMessage = chatWindow.lastElementChild;
+  if (!lastMessage) return;
+
+  const messageContent = lastMessage.querySelector('.message-content');
+  if (!messageContent) return;
+
+  const debugBlock = document.createElement('details');
+  debugBlock.className = 'debug-block';
+  debugBlock.innerHTML = `
+    <summary>Retrieval details</summary>
+    <pre>${escapeHtml(JSON.stringify(debug, null, 2))}</pre>
+  `;
+  messageContent.appendChild(debugBlock);
+}
+
 function showChatLoading() {
   if (loadingMessageEl) {
     return;
@@ -257,6 +276,9 @@ chatForm.addEventListener('submit', async function(e) {
     const aiMsg = data.answer || 'No answer returned.';
     hideChatLoading();
     appendAiMessageWithSources(aiMsg, data.sources || []);
+    if (window.__SHOW_RETRIEVAL_DEBUG__ && data.debug) {
+      appendDebugBlock(data.debug);
+    }
     chatHistory.push({role: 'ai', content: aiMsg});
   } catch (err) {
     hideChatLoading();
@@ -307,6 +329,7 @@ simplifyBtn.addEventListener('click', async function() {
       });
       const data = await response.json();
       text = data.text;
+      extractedPages = data.pages || [];
       if (!text || text.startsWith('⚠️')) {
         resetSimplifyButton();
         output.innerHTML = `<p style="color: var(--error);">${text || '⚠️ PDF extraction failed.'}</p>`;
@@ -335,11 +358,18 @@ simplifyBtn.addEventListener('click', async function() {
       },
       body: JSON.stringify({
         text: text,
-        level: simplicity
+        level: simplicity,
+        pages: inputMethod === 'upload' ? extractedPages : []
       })
     });
     const data = await response.json();
     output.innerHTML = data.summary || 'No summary returned.';
+    if (data.strategy) {
+      const meta = document.createElement('div');
+      meta.className = 'summary-meta';
+      meta.textContent = `Strategy: ${data.strategy} | Estimated tokens: ${data.estimated_tokens || 'n/a'} | Chunks: ${data.chunk_count || 0}`;
+      output.appendChild(meta);
+    }
   } catch (err) {
     output.innerHTML = `<p style="color: var(--error);">⚠️ API Error: ${err.message}</p>`;
   }

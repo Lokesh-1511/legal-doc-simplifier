@@ -584,6 +584,45 @@ body {
   padding: 0.2rem 0.55rem;
 }
 
+.summary-meta {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color);
+  color: var(--text-tertiary);
+  font-size: 0.85rem;
+}
+
+.loading-message {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.debug-block {
+  margin-top: 0.75rem;
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+}
+
+.debug-block summary {
+  cursor: pointer;
+  color: var(--primary-blue);
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+}
+
+.debug-block pre {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  border-radius: var(--border-radius-md);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+
 .loading-response {
   opacity: 0.9;
 }

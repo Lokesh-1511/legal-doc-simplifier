@@ -10,9 +10,15 @@ from markdown import markdown
 try:
     from .chunking import chunk_pages, chunk_plain_text
     from .retrieval import SemanticRetriever
+    from .summarizer import DocumentSummarizer
+    from .reranker import format_context_block, llm_rerank_chunks, source_pages_label
+    from .prompts import QA_SYSTEM_PROMPT
 except ImportError:
     from chunking import chunk_pages, chunk_plain_text
     from retrieval import SemanticRetriever
+    from summarizer import DocumentSummarizer
+    from reranker import format_context_block, llm_rerank_chunks, source_pages_label
+    from prompts import QA_SYSTEM_PROMPT
 
 # Load environment variables
 env_loaded = load_dotenv(find_dotenv())
@@ -33,14 +39,11 @@ else:
 MODEL_NAME = "llama-3.3-70b-versatile"
 client: Optional[Groq] = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 retriever = SemanticRetriever()
+summarizer = DocumentSummarizer()
 chunk_store: List[dict] = []
 stored_document_text = ""
+stored_document_pages: List[dict] = []
 last_extracted_pdf_text = ""
-PROMPTS = {
-    "Quick Summary (ELI5)": "You are a world-class legal document simplifier. Your job is to read the following legal text and provide a quick summary in simple language (ELI5 - Explain Like I'm 5). Focus on the main points, avoid jargon, and make it easy for anyone to understand.\n\nLegal Text:\n{text}\n\nSummary:",
-    "Standard View": "You are a world-class legal document simplifier. Your job is to read the following legal text and provide a clear, concise summary for a general audience. Highlight the key points, obligations, and rights.\n\nLegal Text:\n{text}\n\nSummary:",
-    "Detailed Breakdown": "You are a world-class legal document simplifier. Your job is to read the following legal text and provide a detailed breakdown. List the main sections, summarize each, and explain any important terms or clauses.\n\nLegal Text:\n{text}\n\nDetailed Breakdown:"
-}
 
 app = FastAPI()
 app.add_middleware(
@@ -54,6 +57,7 @@ app.add_middleware(
 class SimplifyRequest(BaseModel):
     text: str
     level: str
+    pages: Optional[List[dict]] = None
 
 class ChatbotRequest(BaseModel):
     summary: str
@@ -87,47 +91,49 @@ def get_groq_client() -> Optional[Groq]:
 
 @app.post("/simplify")
 def simplify(req: SimplifyRequest):
-    global stored_document_text
+    global stored_document_text, stored_document_pages
     stored_document_text = req.text.strip()
+    stored_document_pages = req.pages or []
 
-    # Preserve PDF page-aware chunks created by /extract_pdf.
-    should_reindex_plain_text = (
-        stored_document_text
-        and (not chunk_store or stored_document_text != last_extracted_pdf_text)
-    )
-    if should_reindex_plain_text:
-        rebuild_index_from_text(stored_document_text)
-
-    prompt = PROMPTS[req.level].format(text=req.text)
     groq_client = get_groq_client()
     if groq_client is None:
         return {"summary": "⚠️ GROQ_API_KEY is missing. Add it to .env to enable simplification."}
 
     try:
-        completion = groq_client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[
-                {"role": "system", "content": "You are a world-class legal document simplifier. You follow instructions precisely."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.2,
-            max_tokens=2000
+        if stored_document_pages:
+            rebuild_index_from_chunks(chunk_pages(stored_document_pages))
+        elif stored_document_text and (not chunk_store or stored_document_text != last_extracted_pdf_text):
+            rebuild_index_from_text(stored_document_text)
+
+        result = summarizer.summarize(
+            text=req.text,
+            level=req.level,
+            groq_client=groq_client,
+            pages=req.pages,
+            model_name=MODEL_NAME,
         )
-        raw_output = completion.choices[0].message.content.strip()
-        return {"summary": markdown(raw_output)}
+        return {
+            "summary": markdown(result.summary),
+            "strategy": result.strategy,
+            "estimated_tokens": result.estimated_tokens,
+            "chunk_count": result.chunk_count,
+            "chunk_summaries": result.chunk_summaries,
+        }
     except Exception as e:
         return {"summary": f"⚠️ API Error: {e}"}
 
 @app.post("/extract_pdf")
 def extract_pdf(file: UploadFile = File(...)):
-    global last_extracted_pdf_text
+    global last_extracted_pdf_text, stored_document_pages, stored_document_text
     try:
         file_bytes = file.file.read()
         pages = extract_pages_from_pdf(file_bytes)
         text = "\n".join([str(page["text"]) for page in pages])
         rebuild_index_from_chunks(chunk_pages(pages))
+        stored_document_pages = pages
+        stored_document_text = text.strip()
         last_extracted_pdf_text = text.strip()
-        return {"text": text}
+        return {"text": text, "pages": pages, "page_count": len(pages), "chunk_count": len(chunk_store)}
     except Exception as e:
         return {"text": f"⚠️ PDF Error: {e}"}
 
@@ -144,8 +150,6 @@ def chatbot(req: ChatbotRequest):
     This prevents hallucination (making up legal information).
     If no relevant context found, LLM returns "information not found".
     """
-    from .retrieval_helpers import format_context_block
-    
     if not HF_API_TOKEN:
         return {
             "answer": "⚠️ HF_API_TOKEN is missing. Add it to .env to enable semantic retrieval. Get a free token at https://huggingface.co/settings/tokens",
@@ -158,35 +162,39 @@ def chatbot(req: ChatbotRequest):
             "sources": [],
         }
 
-    top_k = max(1, min(req.top_k, 8))
-    
-    # Retrieve chunks using semantic similarity (embeddings + keyword re-ranking)
-    retrieved_chunks = retriever.search(req.question, top_k=top_k, min_similarity=0.3)
-    
-    # Fallback: if no chunks found, return helpful error
-    if not retrieved_chunks:
-        return {
-            "answer": "❌ Could not find relevant information in the document. Try:\n- Using more descriptive language\n- Breaking complex questions into simpler parts\n- Asking about specific document sections",
-            "sources": [],
-        }
-    
-    # Format context with improved layout
-    context_block = format_context_block(retrieved_chunks)
-    source_pages = sorted({int(chunk["page"]) for chunk in retrieved_chunks})
+    top_k = max(3, min(req.top_k, 5))
 
-    # System prompt enforces context-only answering (prevents hallucination)
-    system_prompt = """You are a legal interview preparation assistant.
+    doc_token_estimate = summarizer.estimate_tokens(stored_document_text or req.summary or "")
+    small_document = doc_token_estimate <= summarizer.direct_token_limit or len(chunk_store) <= 3
 
-CRITICAL RULES:
-1. Answer ONLY using the retrieved context below
-2. If the context doesn't contain the answer, respond exactly: "information not found"
-3. Do NOT use external legal knowledge or hallucinate
-4. Be concise and student-friendly
-5. Cite the page number when relevant
+    if small_document:
+        print(f"📄 Small document QA path (~{doc_token_estimate} tokens). Using full context.")
+        candidate_chunks = chunk_store[:]
+        rerank_meta = {"mode": "full_context"}
+        selected_chunks = candidate_chunks
+    else:
+        print(f"📚 Large document QA path (~{doc_token_estimate} tokens). Using retrieval + reranking.")
+        candidate_chunks = retriever.search(req.question, top_k=5, min_similarity=0.25)
+        if not candidate_chunks:
+            return {
+                "answer": "❌ Could not find relevant information in the document. Try rephrasing the question or asking about a more specific clause.",
+                "sources": [],
+            }
 
-Your role: Help students understand actual document clauses, not teach general law."""
+        selected_chunks, rerank_meta = llm_rerank_chunks(
+            question=req.question,
+            candidates=candidate_chunks,
+            groq_client=get_groq_client(),
+            model_name=MODEL_NAME,
+            max_selected=top_k,
+        )
+        if not selected_chunks:
+            selected_chunks = candidate_chunks[:top_k]
 
-    messages = [{"role": "system", "content": system_prompt}]
+    context_block = format_context_block(selected_chunks)
+    source_label = source_pages_label(selected_chunks)
+
+    messages = [{"role": "system", "content": QA_SYSTEM_PROMPT}]
     
     # Add conversation history for context awareness
     for m in req.history:
@@ -196,15 +204,15 @@ Your role: Help students understand actual document clauses, not teach general l
             messages.append({"role": "assistant", "content": m["content"]})
 
     # Build retrieval-augmented prompt with clear context boundaries
-    retrieval_prompt = f"""RETRIEVED CONTEXT:
+    retrieval_prompt = f"""CONTEXT:
 ---
 {context_block}
 ---
 
-USER QUESTION:
+QUESTION:
 {req.question}
 
-Remember: Answer ONLY from the context above. If not found, say "information not found"."""
+Remember: answer only from the context above. If the answer is not present, say "information not found"."""
     
     messages.append({"role": "user", "content": retrieval_prompt})
 
@@ -212,7 +220,7 @@ Remember: Answer ONLY from the context above. If not found, say "information not
     if groq_client is None:
         return {
             "answer": "⚠️ GROQ_API_KEY is missing. Add it to .env to enable chatbot responses.",
-            "sources": [f"Source: Page {page}" for page in source_pages],
+            "sources": [source_label],
         }
 
     try:
@@ -225,7 +233,13 @@ Remember: Answer ONLY from the context above. If not found, say "information not
         answer = completion.choices[0].message.content.strip()
         return {
             "answer": answer,
-            "sources": [f"Source: Page {page}" for page in source_pages],
+            "sources": [source_label],
+            "debug": {
+                "mode": rerank_meta.get("mode", "unknown"),
+                "candidate_count": len(candidate_chunks),
+                "selected_count": len(selected_chunks),
+                "document_tokens": doc_token_estimate,
+            },
         }
     except Exception as e:
-        return {"answer": f"⚠️ API Error: {e}", "sources": []}
+        return {"answer": f"⚠️ API Error: {e}", "sources": [source_label]}
