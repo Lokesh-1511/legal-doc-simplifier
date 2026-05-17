@@ -133,6 +133,19 @@ def extract_pdf(file: UploadFile = File(...)):
 
 @app.post("/chatbot")
 def chatbot(req: ChatbotRequest):
+    """
+    Legal assistant chatbot powered by semantic retrieval + LLM.
+    
+    Flow:
+    1. Retrieve semantically similar chunks from uploaded document
+    2. Inject into LLM system prompt as context
+    3. LLM answers question using only provided context
+    
+    This prevents hallucination (making up legal information).
+    If no relevant context found, LLM returns "information not found".
+    """
+    from .retrieval_helpers import format_context_block
+    
     if not HF_API_TOKEN:
         return {
             "answer": "⚠️ HF_API_TOKEN is missing. Add it to .env to enable semantic retrieval. Get a free token at https://huggingface.co/settings/tokens",
@@ -146,45 +159,53 @@ def chatbot(req: ChatbotRequest):
         }
 
     top_k = max(1, min(req.top_k, 8))
-    retrieved_chunks = retriever.search(req.question, top_k=top_k)
     
+    # Retrieve chunks using semantic similarity (embeddings + keyword re-ranking)
+    retrieved_chunks = retriever.search(req.question, top_k=top_k, min_similarity=0.3)
+    
+    # Fallback: if no chunks found, return helpful error
     if not retrieved_chunks:
         return {
-            "answer": "❌ Could not retrieve relevant context. Try rephrasing your question.",
+            "answer": "❌ Could not find relevant information in the document. Try:\n- Using more descriptive language\n- Breaking complex questions into simpler parts\n- Asking about specific document sections",
             "sources": [],
         }
     
-    context_block = "\n\n".join(
-        [
-            f"[{chunk['chunk_id']}] (Page {chunk['page']})\n{chunk['text']}"
-            for chunk in retrieved_chunks
-        ]
-    )
+    # Format context with improved layout
+    context_block = format_context_block(retrieved_chunks)
     source_pages = sorted({int(chunk["page"]) for chunk in retrieved_chunks})
 
-    system_prompt = """
-    You are a legal interview preparation assistant.
-    Answer ONLY from the retrieved context.
-    If the retrieved context is insufficient, reply exactly: information not found.
-    Do not hallucinate or add external legal knowledge.
-    Keep the answer concise, clear, and student-friendly.
-    """
+    # System prompt enforces context-only answering (prevents hallucination)
+    system_prompt = """You are a legal interview preparation assistant.
+
+CRITICAL RULES:
+1. Answer ONLY using the retrieved context below
+2. If the context doesn't contain the answer, respond exactly: "information not found"
+3. Do NOT use external legal knowledge or hallucinate
+4. Be concise and student-friendly
+5. Cite the page number when relevant
+
+Your role: Help students understand actual document clauses, not teach general law."""
 
     messages = [{"role": "system", "content": system_prompt}]
+    
+    # Add conversation history for context awareness
     for m in req.history:
         if m["role"] == "user":
             messages.append({"role": "user", "content": m["content"]})
         elif m["role"] == "ai":
             messages.append({"role": "assistant", "content": m["content"]})
 
-    retrieval_prompt = f"""
-    Retrieved context:
-    ---
-    {context_block if context_block else 'No relevant chunks found.'}
-    ---
+    # Build retrieval-augmented prompt with clear context boundaries
+    retrieval_prompt = f"""RETRIEVED CONTEXT:
+---
+{context_block}
+---
 
-    User question: {req.question}
-    """
+USER QUESTION:
+{req.question}
+
+Remember: Answer ONLY from the context above. If not found, say "information not found"."""
+    
     messages.append({"role": "user", "content": retrieval_prompt})
 
     groq_client = get_groq_client()
@@ -198,7 +219,7 @@ def chatbot(req: ChatbotRequest):
         completion = groq_client.chat.completions.create(
             model=MODEL_NAME,
             messages=messages,
-            temperature=0.5,
+            temperature=0.5,  # Balanced: some creativity but grounded
             max_tokens=1000
         )
         answer = completion.choices[0].message.content.strip()
