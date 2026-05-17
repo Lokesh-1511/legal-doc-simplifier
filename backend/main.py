@@ -14,16 +14,25 @@ except ImportError:
     from chunking import chunk_pages, chunk_plain_text
     from retrieval import SemanticRetriever
 
-# Try loading .env from backend folder, then from project root
+# Load environment variables
 env_loaded = load_dotenv(find_dotenv())
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+HF_API_TOKEN = os.getenv("HF_API_TOKEN")
+
 if not GROQ_API_KEY:
-    print("WARNING: GROQ_API_KEY not found. Ensure .env is in backend or project root and contains GROQ_API_KEY=your_actual_key_here")
+    print("⚠️  WARNING: GROQ_API_KEY not found. Simplification and chatbot will not work.")
 else:
-    print("GROQ_API_KEY loaded successfully.")
+    print("✓ GROQ_API_KEY loaded successfully.")
+
+if not HF_API_TOKEN:
+    print("⚠️  WARNING: HF_API_TOKEN not found. Semantic retrieval will not work.")
+    print("   Get a free token at: https://huggingface.co/settings/tokens")
+else:
+    print("✓ HF_API_TOKEN loaded successfully.")
+
 MODEL_NAME = "llama-3.3-70b-versatile"
 client: Optional[Groq] = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
-retriever = SemanticRetriever(model_name="all-MiniLM-L6-v2")
+retriever = SemanticRetriever()
 chunk_store: List[dict] = []
 stored_document_text = ""
 last_extracted_pdf_text = ""
@@ -124,6 +133,12 @@ def extract_pdf(file: UploadFile = File(...)):
 
 @app.post("/chatbot")
 def chatbot(req: ChatbotRequest):
+    if not HF_API_TOKEN:
+        return {
+            "answer": "⚠️ HF_API_TOKEN is missing. Add it to .env to enable semantic retrieval. Get a free token at https://huggingface.co/settings/tokens",
+            "sources": [],
+        }
+    
     if not chunk_store:
         return {
             "answer": "⚠️ Please upload or paste a document first so I can retrieve relevant context.",
@@ -132,6 +147,13 @@ def chatbot(req: ChatbotRequest):
 
     top_k = max(1, min(req.top_k, 8))
     retrieved_chunks = retriever.search(req.question, top_k=top_k)
+    
+    if not retrieved_chunks:
+        return {
+            "answer": "❌ Could not retrieve relevant context. Try rephrasing your question.",
+            "sources": [],
+        }
+    
     context_block = "\n\n".join(
         [
             f"[{chunk['chunk_id']}] (Page {chunk['page']})\n{chunk['text']}"
