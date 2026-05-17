@@ -72,6 +72,14 @@
               <div class="text-input-zone" id="textZone" style="display:none;">
                 <textarea id="textInput" placeholder="Paste your legal document text here..."></textarea>
               </div>
+
+              <div class="document-status" id="documentStatus" style="display:none;">
+                <div class="status-icon"><i class="fas fa-check-circle"></i></div>
+                <div class="status-text">
+                  <p class="status-title">Document processed and indexed</p>
+                  <p class="status-detail" id="statusDetail"></p>
+                </div>
+              </div>
             </div>
 
             <div class="simplification-options">
@@ -188,7 +196,7 @@
   </main>
 
   <script>
-    window.__API_BASE_URL = "https://legal-doc-simplifier-h8r2.onrender.com";
+    window.__API_BASE_URL = "legal-doc-simplifier-production.up.railway.app";
   </script>
   <script src="script.js"></script>
 </body>
