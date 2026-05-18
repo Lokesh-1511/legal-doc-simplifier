@@ -13,6 +13,10 @@ to:
 
 The result is a lightweight RAG-style workflow without FAISS, vector DBs, Docker, or GPU dependencies.
 
+## 🚀 Live Demo
+
+Try the deployed version here: **[https://legal-ease15.vercel.app](https://legal-ease15.vercel.app)**
+
 ## What Changed
 
 1. PDF extraction still uses PyMuPDF.
